@@ -66,6 +66,19 @@ class TestSuggestMethod(TestBase):
 			self.assertTrue(correct in sug)
 
 
+class TestScoredSuggestMethod(TestBase):
+	def test(self):
+		pairs = {
+			'wrod'	: ('word', 66),
+			'tre'	: ('tree', 59),
+			'xoo'	: ('zoo', 59),
+		}
+
+		for incorrect, correct in pairs.items():
+			sug = self.speller.scored_suggest(incorrect)
+			self.assertTrue(correct in sug)
+
+
 class TestAddReplacementMethod(TestBase):
 	def test(self):
 		"addReplacement affects on order of words returing by suggest"

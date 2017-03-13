@@ -75,6 +75,58 @@ typedef struct {
 } aspell_AspellObject;
 
 
+/* helper function: converts an aspell suggestion list into python list */
+static PyObject* AspellSuggestionList2PythonList(PyObject* self, const AspellSuggestionList* sugglist) {
+	PyObject* list;
+	PyObject* elem;
+
+	AspellSuggestionEnumeration* elements;
+	const AspellSuggestion* sugg;
+
+	list = PyList_New(0);
+	if (!list) {
+		PyErr_SetString(PyExc_Exception, "can't create new list");
+		return NULL;
+	}
+
+	elements = aspell_suggestion_list_elements(sugglist);
+	while ( (sugg=aspell_suggestion_enumeration_next(elements)) != 0) {
+		elem = PyUnicode_Decode(sugg->word, sugg->word_len, Encoding(self), NULL);
+
+		if (elem == 0) {
+			delete_aspell_suggestion_enumeration(elements);
+			Py_DECREF(list);
+			return NULL;
+		}
+
+                PyObject *score = PyLong_FromSsize_t(sugg->score);
+                if (!score) {
+                        PyErr_SetString(PyExc_Exception, "can't create new int");
+                        return NULL;
+                }
+
+                PyObject *tuple = PyTuple_New(2);
+                if (!tuple) {
+                        PyErr_SetString(PyExc_Exception, "can't create new tuple");
+                        return NULL;
+                }
+                PyTuple_SET_ITEM(tuple, 0, elem);
+                PyTuple_SET_ITEM(tuple, 1, score);
+
+		if (PyList_Append(list, tuple) == -1) {
+			delete_aspell_suggestion_enumeration(elements);
+			Py_DECREF(elem);
+			Py_DECREF(score);
+			Py_DECREF(tuple);
+			Py_DECREF(list);
+			return NULL;
+		}
+	}
+
+	delete_aspell_suggestion_enumeration(elements);
+	return list;
+}
+
 /* helper function: converts an aspell word list into python list */
 static PyObject* AspellWordList2PythonList(PyObject* self, const AspellWordList* wordlist) {
 	PyObject* list;
@@ -562,6 +614,28 @@ static PyObject* m_suggest(PyObject* self, PyObject* args) {
 		return NULL;
 }
 
+/* method:scored_suggest ************************************************************/
+static PyObject* m_scored_suggest(PyObject* self, PyObject* args) {
+	char* word;
+	Py_ssize_t length;
+	PyObject* buf;
+	PyObject* list;
+
+	buf = get_arg_string(self, args, 0, &word, &length);
+	if (buf) {
+		list = AspellSuggestionList2PythonList(
+			self,
+			aspell_speller_scored_suggest(Speller(self),
+			word,
+			length)
+		);
+		Py_DECREF(buf);
+		return list;
+	}
+	else
+		return NULL;
+}
+
 /* method:getMainwordlist *****************************************************/
 static PyObject* m_getMainwordlist(PyObject* self, PyObject* args) {
 	return AspellWordList2PythonList(self, aspell_speller_main_word_list(Speller(self)));
@@ -689,6 +763,14 @@ static PyMethodDef aspell_object_methods[] = {
 		(PyCFunction)m_suggest,
 		METH_VARARGS,
 		"suggest(word) => list of words\n"
+ 		"Returns a list of suggested spelling for given word.\n"
+		"Even if word is correct (i.e. check(word) returned 1) aspell performs action."
+	},
+	{
+		"scored_suggest",
+		(PyCFunction)m_scored_suggest,
+		METH_VARARGS,
+		"scored_suggest(word) => list of words\n"
  		"Returns a list of suggested spelling for given word.\n"
 		"Even if word is correct (i.e. check(word) returned 1) aspell performs action."
 	},

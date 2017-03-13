@@ -48,6 +48,9 @@ words = [
 for word in words:
 	print "* '%s': %s" % (word, ', '.join(speller.suggest(word)))
 
+for word in words:
+	print "* '%s': %s" % (word, ', '.join(speller.scored_suggest(word)))
+
 ##################################################
 print "="*60
 print "addReplacement method:"
