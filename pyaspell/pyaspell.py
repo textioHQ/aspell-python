@@ -139,6 +139,22 @@ class AspellLinux(object):
 			raise TypeError("String expected")
 
 
+	def scored_suggest(self, word):
+		"""
+		Return list of spelling suggestions of given word.
+		Works even if word is correct.
+		"""
+		if type(word) is str:
+			return self._aspellsuggestionlist(
+				self.__lib.aspell_speller_scored_suggest(
+					self.__speller,
+					_to_bytes(word),
+					len(word)
+				))
+		else:
+			raise TypeError("String expected")
+
+
 	def personal_dict(self, word=None):
 		"""
 		Aspell's personal dictionary is a user defined, persistent
@@ -335,6 +351,26 @@ class AspellLinux(object):
 				list.append(_from_bytes(word.value))
 
 		self.__lib.delete_aspell_string_enumeration(elements)
+		return list
+	
+	# XXX: internal function, do not call directly
+	def _aspellsuggestionlist(self, suggestionlist_id):
+		"""
+		XXX: internal function
+
+		Converts aspell list into python list.
+		"""
+		elements = self.__lib.aspell_word_list_elements(suggestionlist_id)
+		list = []
+		while True:
+			suggptr = self.__lib.aspell_suggestion_enumeration_next(elements)
+			if not suggptr:
+				break
+			else:
+				word = ctypes.c_char_p(suggptr.word)
+				list.append(_from_bytes(word.value))
+
+		self.__lib.delete_aspell_suggestion_enumeration(elements)
 		return list
 	
 

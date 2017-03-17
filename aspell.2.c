@@ -47,6 +47,30 @@ $Id: aspell.c,v 1.2 2006-09-27 16:45:16 wojtek Exp $
 #include <aspell.h>
 
 /* helper function: converts an aspell word list into python list */
+static PyObject* AspellSuggestionList2PythonList(const AspellSuggestionList* sugglist) {
+	PyObject* list;
+	AspellSuggestionEnumeration* elements;
+	const AspellSuggestion* sugg;
+
+	list = PyList_New(0);
+	if (!list) {
+		PyErr_SetString(PyExc_Exception, "can't create new list");
+		return NULL;
+	}
+
+	elements = aspell_suggestion_list_elements(sugglist);
+	while ( (sugg=aspell_suggestion_enumeration_next(elements)) != 0)
+          if (PyList_Append(list, Py_BuildValue("si", sugg->word, sugg->score)) == -1) {
+			PyErr_SetString(PyExc_Exception, "It is almost impossible, but happend! Can't append element to the list.");
+			delete_aspell_suggestion_enumeration(elements);
+			Py_DECREF(list);
+			return NULL;
+		}
+	delete_aspell_suggestion_enumeration(elements);
+	return list;
+}
+
+/* helper function: converts an aspell word list into python list */
 static PyObject* AspellWordList2PythonList(const AspellWordList* wordlist) {
 	PyObject* list;
 	AspellStringEnumeration* elements;
@@ -440,6 +464,19 @@ static PyObject* m_suggest(PyObject* self, PyObject* args) {
 	return AspellWordList2PythonList( aspell_speller_suggest(Speller(self), word, length));
 }
 
+/* method:scored_suggest ************************************************************/
+static PyObject* m_scored_suggest(PyObject* self, PyObject* args) {
+	char* word;
+	int   length;
+
+	if (!PyArg_ParseTuple(args, "s#", &word, &length)) {
+		PyErr_SetString(PyExc_TypeError, "string expeced");
+		return NULL;
+	}
+
+	return AspellSuggestionList2PythonList( aspell_speller_scored_suggest(Speller(self), word, length));
+}
+
 /* method:getMainwordlist *****************************************************/
 static PyObject* m_getMainwordlist(PyObject* self, PyObject* args) {
 	return AspellWordList2PythonList( aspell_speller_main_word_list(Speller(self)));
@@ -558,6 +595,14 @@ static PyMethodDef aspell_object_methods[] = {
 	{
 		"suggest",
 		(PyCFunction)m_suggest,
+		METH_VARARGS,
+		"suggest(word) => list of words\n"
+ 		"Returns a list of suggested spelling for given word.\n"
+		"Even if word is correct (i.e. check(word) returned 1) aspell performs action."
+	},
+	{
+		"scored_suggest",
+		(PyCFunction)m_scored_suggest,
 		METH_VARARGS,
 		"suggest(word) => list of words\n"
  		"Returns a list of suggested spelling for given word.\n"
